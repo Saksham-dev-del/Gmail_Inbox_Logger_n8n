@@ -1,0 +1,258 @@
+{
+  "name": "Gmail Inbox Logger → Google Sheets",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 15
+            }
+          ]
+        }
+      },
+      "id": "node-schedule-001",
+      "name": "⏰ Every 15 Minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "filters": {
+          "readStatus": "unread"
+        },
+        "limit": 10,
+        "options": {
+          "dataPropertyAttachmentsPrefixName": "",
+          "downloadAttachments": false
+        },
+        "simple": true
+      },
+      "id": "node-gmail-002",
+      "name": "📧 Get Unread Emails",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [460, 300],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "REPLACE_WITH_YOUR_GMAIL_CREDENTIAL_ID",
+          "name": "Gmail Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "field-date",
+              "name": "Date",
+              "value": "={{ new Date().toLocaleDateString('en-IN', {day:'2-digit', month:'short', year:'numeric'}) }}",
+              "type": "string"
+            },
+            {
+              "id": "field-time",
+              "name": "Time",
+              "value": "={{ new Date().toLocaleTimeString('en-IN', {hour:'2-digit', minute:'2-digit', hour12:true}) }}",
+              "type": "string"
+            },
+            {
+              "id": "field-sender-name",
+              "name": "Sender Name",
+              "value": "={{ $json.from ? $json.from.split('<')[0].trim() : 'Unknown' }}",
+              "type": "string"
+            },
+            {
+              "id": "field-sender-email",
+              "name": "Sender Email",
+              "value": "={{ $json.from ? ($json.from.includes('<') ? $json.from.split('<')[1].replace('>','').trim() : $json.from) : '' }}",
+              "type": "string"
+            },
+            {
+              "id": "field-subject",
+              "name": "Subject",
+              "value": "={{ $json.subject || '(No Subject)' }}",
+              "type": "string"
+            },
+            {
+              "id": "field-preview",
+              "name": "Preview",
+              "value": "={{ $json.snippet || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "field-label",
+              "name": "Label",
+              "value": "={{ $json.labelIds ? $json.labelIds.filter(l => !['UNREAD','INBOX','IMPORTANT'].includes(l)).join(', ') || 'Inbox' : 'Inbox' }}",
+              "type": "string"
+            },
+            {
+              "id": "field-status",
+              "name": "Status",
+              "value": "=Unread",
+              "type": "string"
+            },
+            {
+              "id": "field-message-id",
+              "name": "Message ID",
+              "value": "={{ $json.id }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "node-editfields-003",
+      "name": "🔧 Format Email Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "REPLACE_WITH_YOUR_SPREADSHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Sheet1",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Date": "={{ $json['Date'] }}",
+            "Time": "={{ $json['Time'] }}",
+            "Sender Name": "={{ $json['Sender Name'] }}",
+            "Sender Email": "={{ $json['Sender Email'] }}",
+            "Subject": "={{ $json['Subject'] }}",
+            "Preview": "={{ $json['Preview'] }}",
+            "Label": "={{ $json['Label'] }}",
+            "Status": "={{ $json['Status'] }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            { "id": "Date",         "displayName": "Date",         "type": "string", "required": false, "defaultMatch": false, "canBeUsedToMatch": true },
+            { "id": "Time",         "displayName": "Time",         "type": "string", "required": false, "defaultMatch": false, "canBeUsedToMatch": true },
+            { "id": "Sender Name",  "displayName": "Sender Name",  "type": "string", "required": false, "defaultMatch": false, "canBeUsedToMatch": true },
+            { "id": "Sender Email", "displayName": "Sender Email", "type": "string", "required": false, "defaultMatch": false, "canBeUsedToMatch": true },
+            { "id": "Subject",      "displayName": "Subject",      "type": "string", "required": false, "defaultMatch": false, "canBeUsedToMatch": true },
+            { "id": "Preview",      "displayName": "Preview",      "type": "string", "required": false, "defaultMatch": false, "canBeUsedToMatch": true },
+            { "id": "Label",        "displayName": "Label",        "type": "string", "required": false, "defaultMatch": false, "canBeUsedToMatch": true },
+            { "id": "Status",       "displayName": "Status",       "type": "string", "required": false, "defaultMatch": false, "canBeUsedToMatch": true }
+          ]
+        },
+        "options": {}
+      },
+      "id": "node-sheets-004",
+      "name": "📊 Save to Google Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [900, 300],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "REPLACE_WITH_YOUR_SHEETS_CREDENTIAL_ID",
+          "name": "Google Sheets Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "markAsRead",
+        "messageId": "={{ $('🔧 Format Email Data').item.json['Message ID'] }}"
+      },
+      "id": "node-gmail-markread-005",
+      "name": "✅ Mark as Read",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [1120, 300],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "REPLACE_WITH_YOUR_GMAIL_CREDENTIAL_ID",
+          "name": "Gmail Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "cond-001",
+              "leftValue": "={{ $json.from }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "node-filter-006",
+      "name": "🔍 Valid Email Only",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2,
+      "position": [680, 500]
+    }
+  ],
+  "connections": {
+    "⏰ Every 15 Minutes": {
+      "main": [
+        [{ "node": "📧 Get Unread Emails", "type": "main", "index": 0 }]
+      ]
+    },
+    "📧 Get Unread Emails": {
+      "main": [
+        [{ "node": "🔧 Format Email Data", "type": "main", "index": 0 }]
+      ]
+    },
+    "🔧 Format Email Data": {
+      "main": [
+        [{ "node": "📊 Save to Google Sheets", "type": "main", "index": 0 }]
+      ]
+    },
+    "📊 Save to Google Sheets": {
+      "main": [
+        [{ "node": "✅ Mark as Read", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": ""
+  },
+  "staticData": null,
+  "tags": ["Gmail", "Google Sheets", "Automation", "Email Logger"],
+  "triggerCount": 1,
+  "updatedAt": "2025-06-12T00:00:00.000Z",
+  "versionId": "v1.0.0",
+  "_comment": {
+    "instructions": "HOW TO IMPORT THIS WORKFLOW IN n8n",
+    "step1": "n8n open karo → localhost:5678",
+    "step2": "Left sidebar → Workflows → + New Workflow",
+    "step3": "Top right → ••• (3 dots menu) → Import from File",
+    "step4": "Ye JSON file select karo",
+    "step5": "Gmail node pe double click → Credentials → Create New → Sign in with Google",
+    "step6": "Google Sheets node → Credentials → Create New → Same Google account",
+    "step7": "Google Sheets node → Document field mein apni 'Gmail Inbox Log' spreadsheet select karo",
+    "step8": "Top pe 'Test Workflow' click karo → Test karo",
+    "step9": "Top right Toggle → ON → Done! Har 15 min pe auto-run hoga"
+  }
+}
